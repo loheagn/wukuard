@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = "github.com/loheagn/wukuard/grpc";
+option java_multiple_files = true;
+option java_package = "com.github.loheagn.wukuard.grpc";
+option java_outer_classname = "WukuardProto";
+
+package grpc;
+
+service SyncNet {
+  // SelfReport : client sends info about itself to server
+  // and server returns all information about the current network
+  rpc SelfReport (Peer) returns (NetWork) {}
+}
+
+message Peer {
+  string endpoint = 1;
+  string publicKey = 2;
+  repeated string allowedIPs = 3;
+
+  string macAddress = 4;
+  string hostname = 5;
+}
+
+message NetWork {
+  repeated Peer peerList = 1;
+}
