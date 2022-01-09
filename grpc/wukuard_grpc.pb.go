@@ -18,9 +18,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SyncNetClient interface {
-	// SelfReport : client sends info about itself to server
+	// HeartBeat : client sends info about itself to server
 	// and server returns all information about the current network
-	SelfReport(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NetWork, error)
+	HeartBeat(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NetWork, error)
 }
 
 type syncNetClient struct {
@@ -31,9 +31,9 @@ func NewSyncNetClient(cc grpc.ClientConnInterface) SyncNetClient {
 	return &syncNetClient{cc}
 }
 
-func (c *syncNetClient) SelfReport(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NetWork, error) {
+func (c *syncNetClient) HeartBeat(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NetWork, error) {
 	out := new(NetWork)
-	err := c.cc.Invoke(ctx, "/grpc.SyncNet/SelfReport", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/grpc.SyncNet/HeartBeat", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -44,9 +44,9 @@ func (c *syncNetClient) SelfReport(ctx context.Context, in *Peer, opts ...grpc.C
 // All implementations must embed UnimplementedSyncNetServer
 // for forward compatibility
 type SyncNetServer interface {
-	// SelfReport : client sends info about itself to server
+	// HeartBeat : client sends info about itself to server
 	// and server returns all information about the current network
-	SelfReport(context.Context, *Peer) (*NetWork, error)
+	HeartBeat(context.Context, *Peer) (*NetWork, error)
 	mustEmbedUnimplementedSyncNetServer()
 }
 
@@ -54,8 +54,8 @@ type SyncNetServer interface {
 type UnimplementedSyncNetServer struct {
 }
 
-func (UnimplementedSyncNetServer) SelfReport(context.Context, *Peer) (*NetWork, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SelfReport not implemented")
+func (UnimplementedSyncNetServer) HeartBeat(context.Context, *Peer) (*NetWork, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HeartBeat not implemented")
 }
 func (UnimplementedSyncNetServer) mustEmbedUnimplementedSyncNetServer() {}
 
@@ -70,20 +70,20 @@ func RegisterSyncNetServer(s grpc.ServiceRegistrar, srv SyncNetServer) {
 	s.RegisterService(&SyncNet_ServiceDesc, srv)
 }
 
-func _SyncNet_SelfReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _SyncNet_HeartBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Peer)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SyncNetServer).SelfReport(ctx, in)
+		return srv.(SyncNetServer).HeartBeat(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/grpc.SyncNet/SelfReport",
+		FullMethod: "/grpc.SyncNet/HeartBeat",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncNetServer).SelfReport(ctx, req.(*Peer))
+		return srv.(SyncNetServer).HeartBeat(ctx, req.(*Peer))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -96,8 +96,8 @@ var SyncNet_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*SyncNetServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SelfReport",
-			Handler:    _SyncNet_SelfReport_Handler,
+			MethodName: "HeartBeat",
+			Handler:    _SyncNet_HeartBeat_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

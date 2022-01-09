@@ -8,9 +8,9 @@ option java_outer_classname = "WukuardProto";
 package grpc;
 
 service SyncNet {
-  // SelfReport : client sends info about itself to server
+  // HeartBeat : client sends info about itself to server
   // and server returns all information about the current network
-  rpc SelfReport (Peer) returns (NetWork) {}
+  rpc HeartBeat (Peer) returns (NetWork) {}
 }
 
 message Peer {
