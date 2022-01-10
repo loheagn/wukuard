@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SyncNetClient interface {
 	// HeartBeat : client sends info about itself to server
 	// and server returns all information about the current network
-	HeartBeat(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NetWork, error)
+	HeartBeat(ctx context.Context, in *PeerRequest, opts ...grpc.CallOption) (*NetWorkResponse, error)
 }
 
 type syncNetClient struct {
@@ -31,8 +31,8 @@ func NewSyncNetClient(cc grpc.ClientConnInterface) SyncNetClient {
 	return &syncNetClient{cc}
 }
 
-func (c *syncNetClient) HeartBeat(ctx context.Context, in *Peer, opts ...grpc.CallOption) (*NetWork, error) {
-	out := new(NetWork)
+func (c *syncNetClient) HeartBeat(ctx context.Context, in *PeerRequest, opts ...grpc.CallOption) (*NetWorkResponse, error) {
+	out := new(NetWorkResponse)
 	err := c.cc.Invoke(ctx, "/grpc.SyncNet/HeartBeat", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (c *syncNetClient) HeartBeat(ctx context.Context, in *Peer, opts ...grpc.Ca
 type SyncNetServer interface {
 	// HeartBeat : client sends info about itself to server
 	// and server returns all information about the current network
-	HeartBeat(context.Context, *Peer) (*NetWork, error)
+	HeartBeat(context.Context, *PeerRequest) (*NetWorkResponse, error)
 	mustEmbedUnimplementedSyncNetServer()
 }
 
@@ -54,7 +54,7 @@ type SyncNetServer interface {
 type UnimplementedSyncNetServer struct {
 }
 
-func (UnimplementedSyncNetServer) HeartBeat(context.Context, *Peer) (*NetWork, error) {
+func (UnimplementedSyncNetServer) HeartBeat(context.Context, *PeerRequest) (*NetWorkResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HeartBeat not implemented")
 }
 func (UnimplementedSyncNetServer) mustEmbedUnimplementedSyncNetServer() {}
@@ -71,7 +71,7 @@ func RegisterSyncNetServer(s grpc.ServiceRegistrar, srv SyncNetServer) {
 }
 
 func _SyncNet_HeartBeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Peer)
+	in := new(PeerRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func _SyncNet_HeartBeat_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/grpc.SyncNet/HeartBeat",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SyncNetServer).HeartBeat(ctx, req.(*Peer))
+		return srv.(SyncNetServer).HeartBeat(ctx, req.(*PeerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

@@ -10,18 +10,23 @@ package grpc;
 service SyncNet {
   // HeartBeat : client sends info about itself to server
   // and server returns all information about the current network
-  rpc HeartBeat (Peer) returns (NetWork) {}
+  rpc HeartBeat (PeerRequest) returns (NetWorkResponse) {}
 }
 
-message Peer {
+message PeerRequest {
   string endpoint = 1;
   string publicKey = 2;
-  repeated string allowedIPs = 3;
 
   string macAddress = 4;
   string hostname = 5;
 }
 
-message NetWork {
-  repeated Peer peerList = 1;
+message PeerResponse {
+  string endpoint = 1;
+  string publicKey = 2;
+  repeated string allowedIPs = 3;
+}
+
+message NetWorkResponse {
+  repeated PeerResponse peerList = 1;
 }
