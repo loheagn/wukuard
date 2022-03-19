@@ -279,8 +279,9 @@ func clientMain(serverAddr, inputInterfaceName string) {
 	interfaceName = inputInterfaceName
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", serverIP, serverGrpcPort), grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("ERROR: did not connect: %v", err)
 	}
+	log.Printf("INFO: connected to the server(%s:%s)......\n", serverIP, serverGrpcPort)
 	defer conn.Close()
 	c := pb.NewSyncNetClient(conn)
 
