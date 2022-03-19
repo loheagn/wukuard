@@ -15,18 +15,26 @@ service SyncNet {
 
 message PeerRequest {
   string endpoint = 1;
-  string publicKey = 2;
-
-  string macAddress = 4;
-  string hostname = 5;
+  string macAddress = 2;
+  string hostname = 3;
 }
 
 message PeerResponse {
   string endpoint = 1;
   string publicKey = 2;
-  repeated string allowedIPs = 3;
+  string allowedIPs = 3;
+  int32 PersistentKeepalive = 4;
+}
+
+message InterfaceResponse {
+  string privateKey = 1;
+  string address = 2;
+  int32 listenPort = 3;
+  string postUp = 4;
+  string preDown = 5;
 }
 
 message NetWorkResponse {
-  repeated PeerResponse peerList = 1;
+  InterfaceResponse interfaceResponse = 1;
+  repeated PeerResponse peerList = 2;
 }

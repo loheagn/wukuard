@@ -2,19 +2,28 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log"
+	"net"
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
+	"strings"
+	"sync"
 	"syscall"
+	"time"
 
+	pb "github.com/loheagn/wukuard/grpc"
+	"google.golang.org/grpc"
 	"gopkg.in/ini.v1"
 )
 
 type InterfaceConf struct {
 	PrivateKey string
 	Address    string
-	ListenPort int
+	ListenPort int32
 	PostUp     string
 	PreDown    string
 }
@@ -23,13 +32,21 @@ type PeerConf struct {
 	PublicKey           string
 	AllowedIPs          string
 	Endpoint            string
-	PersistentKeepalive int
+	PersistentKeepalive int32
 }
 
 type WgConf struct {
 	interfaceConf *InterfaceConf
 	peerConfList  []*PeerConf
 }
+
+var (
+	serverIP       string
+	serverGrpcPort string
+	interfaceName  string // the name of network interface
+)
+
+var wgMutex sync.Mutex
 
 func (interfaceConf InterfaceConf) generateString() string {
 	return fmt.Sprintf(`
@@ -130,8 +147,93 @@ func prepareConfFile() error {
 	return nil
 }
 
-func sync(inputConf *WgConf) {
+func getLocalIP() string {
+	conn, err := net.Dial("udp", serverIP)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP.String()
+}
+
+func getMacAddress() string {
+	if interfaceName == "" {
+		return ""
+	}
+	ifas, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, v := range ifas {
+		if v.Name == interfaceName {
+			return v.HardwareAddr.String()
+		}
+	}
+	return ""
+}
+
+func getHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return ""
+	}
+	return hostname
+}
+
+func parseServerAddr(addr string) {
+	ip, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		log.Panic(err)
+	}
+	serverIP, serverGrpcPort = ip, port
+}
+
+func mapGrpcResponse(network *pb.NetWorkResponse) *WgConf {
+	wgConf := &WgConf{}
+	interfaceResponse := network.GetInterfaceResponse()
+	if interfaceResponse == nil {
+		return nil
+	}
+	wgConf.interfaceConf = &InterfaceConf{
+		PrivateKey: interfaceResponse.PrivateKey,
+		Address:    interfaceResponse.Address,
+		ListenPort: interfaceResponse.ListenPort,
+		PostUp:     interfaceResponse.PostUp,
+		PreDown:    interfaceResponse.PreDown,
+	}
+
+	var peerConfList []*PeerConf
+	localIP := getLocalIP()
+	for _, peer := range network.PeerList {
+		if strings.HasPrefix(peer.Endpoint, localIP) {
+			// this peer describes itself
+			continue
+		}
+		peerConfList = append(peerConfList, &PeerConf{
+			PublicKey:           peer.PublicKey,
+			AllowedIPs:          peer.AllowedIPs,
+			Endpoint:            peer.Endpoint,
+			PersistentKeepalive: peer.PersistentKeepalive,
+		})
+	}
+	// sort peerConfList by endpoint
+	sort.Slice(peerConfList, func(i, j int) bool {
+		return peerConfList[i].Endpoint < peerConfList[j].Endpoint
+	})
+	wgConf.peerConfList = peerConfList
+
+	return wgConf
+}
+
+func syncWgConf(inputConf *WgConf) {
 	var err error
+
+	wgMutex.Lock()
+	defer wgMutex.Unlock()
+
 	err = prepareConfFile()
 	checkErr(err)
 
@@ -163,6 +265,33 @@ func sync(inputConf *WgConf) {
 	}
 }
 
-func clientMain() {
+func buildPeerRequest() *pb.PeerRequest {
+	return &pb.PeerRequest{
+		Endpoint:   fmt.Sprintf("%s:9619", getLocalIP()),
+		MacAddress: getMacAddress(),
+		Hostname:   getHostname(),
+	}
+}
 
+func clientMain(serverAddr, inputInterfaceName string) {
+	parseServerAddr(serverAddr)
+	log.Printf("INFO: try to connect to the server(%s:%s)......\n", serverIP, serverGrpcPort)
+	interfaceName = inputInterfaceName
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%s", serverIP, serverGrpcPort), grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	c := pb.NewSyncNetClient(conn)
+
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
+	for {
+		<-t.C
+		resp, err := c.HeartBeat(context.Background(), buildPeerRequest())
+		if err != nil {
+			log.Printf("ERROR: get error from grpc server: %s\n", err.Error())
+		}
+		syncWgConf(mapGrpcResponse(resp))
+	}
 }
