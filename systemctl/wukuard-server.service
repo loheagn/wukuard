@@ -1,0 +1,10 @@
+[Unit]
+Description=wukuard(https://githug.com/loheagn/wukuard)
+After=network.target
+
+[Service]
+Restart=always
+ExecStart=wukuard server /etc/config.yaml
+
+[Install]
+WantedBy=multi-user.target

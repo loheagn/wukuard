@@ -1,0 +1,10 @@
+[Unit]
+Description=wukuard(https://github.com/loheagn/wukuard)
+After=network.target
+
+[Service]
+Restart=always
+ExecStart=wukuard client $WUKUARD_SERVER_ADDR $WUKUARD_INTERFACE
+
+[Install]
+WantedBy=multi-user.target
