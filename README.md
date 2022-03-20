@@ -1,2 +1,3 @@
 # wukuard
-A full-mesh wireguard service.
+
+A simple tool to help to build a full-mesh wireguard service.
