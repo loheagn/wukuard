@@ -6,14 +6,22 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
+	args := os.Args
+	if len(args) < 3 {
 		panic("no enough args")
 	}
-	switch strings.ToLower(os.Args[1]) {
+
+	switch strings.ToLower(args[1]) {
 	case "server":
-		serverMain()
+		confPath := args[2]
+		serverMain(confPath)
 	case "client":
-		clientMain()
+		serverAddr := args[2]
+		inputInterfaceName := ""
+		if len(args) > 3 {
+			inputInterfaceName = args[3]
+		}
+		clientMain(serverAddr, inputInterfaceName)
 	default:
 		panic("unknown action")
 	}

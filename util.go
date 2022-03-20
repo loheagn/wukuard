@@ -1,15 +1,24 @@
 package main
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 func checkErr(err error) {
 	if err != nil {
-		panic(err)
+		log.Printf("ERROR: %s", err.Error())
 	}
 }
 
-func readFile(filename string) string {
+func readFile(filename string) (string, error) {
 	bytes, err := os.ReadFile(filename)
-	checkErr(err)
-	return string(bytes)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+
+func writeFile(filename, content string) error {
+	return os.WriteFile(filename, []byte(content), os.ModePerm)
 }

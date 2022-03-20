@@ -17,7 +17,6 @@ import (
 
 	pb "github.com/loheagn/wukuard/grpc"
 	"google.golang.org/grpc"
-	"gopkg.in/ini.v1"
 )
 
 type InterfaceConf struct {
@@ -86,35 +85,12 @@ const (
 	serviceName  = "wg-quick@wukuard.service"
 )
 
-func compareInterfaceConf(src, input *InterfaceConf) bool {
-	if src == nil || input == nil {
-		return src == input
-	}
-	if src.PrivateKey != input.PrivateKey ||
-		src.Address != input.Address ||
-		src.ListenPort != input.ListenPort ||
-		src.PostUp != input.PostUp ||
-		src.PreDown != input.PreDown {
-		return false
-	}
-	return true
-}
-
-func getCurrentConf() (*InterfaceConf, string, error) {
+func getCurrentConf() (string, error) {
 	wholeConfStr, err := readFile(confFilename)
 	if err != nil {
-		return nil, "", err
+		return "", err
 	}
-	cfg, err := ini.Load(confFilename)
-	if err != nil {
-		return nil, "", err
-	}
-	interfaceConf := &InterfaceConf{}
-	err = cfg.Section("Interface").MapTo(interfaceConf)
-	if err != nil {
-		return nil, "", err
-	}
-	return interfaceConf, wholeConfStr, nil
+	return wholeConfStr, nil
 }
 
 func checkServiceIsRunning() bool {
@@ -148,14 +124,14 @@ func prepareConfFile() error {
 }
 
 func getLocalIP() string {
-	conn, err := net.Dial("udp", serverIP)
+	conn, err := net.Dial("udp", serverIP+":80")
+
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
 	return localAddr.IP.String()
 }
 
@@ -234,34 +210,35 @@ func syncWgConf(inputConf *WgConf) {
 	wgMutex.Lock()
 	defer wgMutex.Unlock()
 
+	if inputConf == nil || inputConf.interfaceConf == nil {
+		err = writeFile(confFilename, "")
+		checkErr(err)
+		if checkServiceIsRunning() {
+			log.Println("INFO: stop wukuard service")
+			_ = exec.Command("/bin/bash", "-c", "ip link delete wukuard").Run()
+			err = exec.Command("systemctl", "stop", serviceName).Run()
+			checkErr(err)
+		}
+		return
+	}
+
 	err = prepareConfFile()
 	checkErr(err)
 
-	restartFlag := false
-	if !checkServiceIsRunning() {
-		restartFlag = true
-	}
-
-	interfaceConf, wholeConfStr, err := getCurrentConf()
-	checkErr(err)
-	if !compareInterfaceConf(interfaceConf, inputConf.interfaceConf) {
-		restartFlag = true
-	}
-
-	if restartFlag {
-		err = writeFile(confFilename, inputConf.generateString())
-		checkErr(err)
-		err = exec.Command("systemctl", "restart", serviceName).Run()
-		checkErr(err)
-	}
-
+	wholeConfStr, err := getCurrentConf()
 	inputConfStr := inputConf.generateString()
-	if wholeConfStr != inputConfStr {
-		// need sync
+	if wholeConfStr != inputConfStr || !checkServiceIsRunning() {
 		err = writeFile(confFilename, inputConfStr)
 		checkErr(err)
-		err = exec.Command("wg syncconf wukuard <(wg-quick strip wukuard)").Run()
-		checkErr(err)
+		log.Println("INFO: restart wukuard service")
+		err = exec.Command("systemctl", "restart", serviceName).Run()
+		if err != nil {
+			// stupid but effective
+			_ = exec.Command("/bin/bash", "-c", "ip link delete wukuard").Run()
+			err = exec.Command("systemctl", "restart", serviceName).Run()
+			checkErr(err)
+		}
+		return
 	}
 }
 
@@ -287,6 +264,11 @@ func clientMain(serverAddr, inputInterfaceName string) {
 
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
+	defer func() {
+		_ = exec.Command("/bin/bash", "-c", "ip link delete wukuard").Run()
+		err = exec.Command("systemctl", "stop", serviceName).Run()
+		checkErr(err)
+	}()
 	for {
 		<-t.C
 		resp, err := c.HeartBeat(context.Background(), buildPeerRequest())
